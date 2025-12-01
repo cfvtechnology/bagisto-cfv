@@ -48,9 +48,9 @@ RUN npm install -g npx
 RUN npm install -g laravel-echo-server
 
 # arguments
-ARG container_project_path
-ARG uid
-ARG user
+ARG container_project_path=/var/www/html/
+ARG uid=1000
+ARG user=bagisto
 
 # copy php-fpm pool configuration
 COPY ./.configs/nginx/pools/www.cnf /usr/local/etc/php-fpm.d/www.conf
