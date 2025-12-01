@@ -49,23 +49,23 @@ RUN npm install -g laravel-echo-server
 
 # arguments
 ARG container_project_path=/var/www/html/
-ARG uid=1000
-ARG user=bagisto
+ARG APP_UID=1000
+ARG APP_USER=bagisto
 
 # copy php-fpm pool configuration
 COPY ./.configs/nginx/pools/www.cnf /usr/local/etc/php-fpm.d/www.conf
 
 # adding user
-RUN useradd -G www-data,root -u $uid -d /home/$user $user
-RUN mkdir -p /home/$user/.composer && \
-    chown -R $user:$user /home/$user
+RUN useradd -G www-data,root -u ${APP_UID} -d /home/${APP_USER} ${APP_USER} && \
+    mkdir -p /home/${APP_USER}/.composer && \
+    chown -R ${APP_USER}:${APP_USER} /home/${APP_USER}
 
 # setting up project from `src` folder
-RUN chmod -R 775 $container_project_path
-RUN chown -R $user:www-data $container_project_path
+RUN chmod -R 775 ${container_project_path} && \
+    chown -R ${APP_USER}:www-data ${container_project_path}
 
 # changing user
-USER $user
+USER ${APP_USER}
 
 # setting work directory
-WORKDIR $container_project_path
+WORKDIR ${container_project_path}
