@@ -8,6 +8,8 @@ services:
         user: ${APP_USER:-bagisto}
         container_project_path: /var/www/html/
     image: bagisto-php-fpm
+    networks:
+      - bagisto-network
     environment:
       # Internal configuration
       APP_USER: ${APP_USER:-bagisto}
@@ -72,6 +74,8 @@ services:
 
   nginx:
     image: nginx:latest
+    networks:
+      - bagisto-network
     expose:
       - "80" # Traefik/Dokploy hablará con este puerto interno
     labels:
@@ -88,6 +92,8 @@ services:
 
   mysql:
     image: mysql:8.0
+    networks:
+      - bagisto-network
     command: --default-authentication-plugin=mysql_native_password
     environment:
       MYSQL_ROOT_HOST: "%"
@@ -101,6 +107,8 @@ services:
 
   phpmyadmin:
     image: phpmyadmin:latest
+    networks:
+      - bagisto-network
     expose:
       - "80" # solo interno; si se quiere dominio aparte, Dokploy lo expondrá
     environment:
@@ -115,12 +123,16 @@ services:
 
   redis:
     image: redis:6.2-alpine
+    networks:
+      - bagisto-network
     command: redis-server --save 20 1 --loglevel warning
     volumes:
       - ./.configs/data/redis-data:/data
 
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:7.17.0
+    networks:
+      - bagisto-network
     environment:
       - xpack.security.enabled=false
       - discovery.type=single-node
@@ -138,6 +150,8 @@ services:
 
   kibana:
     image: docker.elastic.co/kibana/kibana:7.17.0
+    networks:
+      - bagisto-network
     environment:
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
     depends_on:
@@ -145,9 +159,15 @@ services:
 
   mailpit:
     image: axllent/mailpit:latest
+    networks:
+      - bagisto-network
     expose:
       - "8025"
       - "1025"
+
+networks:
+  bagisto-network:
+    driver: bridge
 
 volumes:
   bagisto_data:
