@@ -197,25 +197,36 @@ setup_bagisto_source() {
 
     if [ "$file_count" -gt 0 ]; then
         log_warning "El directorio $WORK_DIR no está vacío"
-        log_info "Contenido actual:"
-        ls -la
 
-        # Check if it's just temporary files or lock files
-        local critical_files=$(ls -A . 2>/dev/null | grep -v -E '^(\.|lost\+found)' | wc -l)
+        # If FORCE_CLEAN is enabled, clean the directory
+        if [ "${FORCE_CLEAN:-false}" = "true" ]; then
+            log_warning "FORCE_CLEAN=true: Eliminando contenido del directorio..."
 
-        if [ "$critical_files" -gt 0 ]; then
-            log_error "El directorio contiene archivos que podrían ser importantes"
-            log_error "Por seguridad, no se eliminará el contenido automáticamente"
-            log_error ""
-            log_error "Opciones:"
-            log_error "1. Si estás seguro de eliminar el contenido, ejecuta manualmente:"
-            log_error "   docker exec <container> rm -rf /var/www/html/*"
-            log_error "   docker exec <container> rm -rf /var/www/html/.[!.]*"
-            log_error "2. O monta un volumen vacío en Dokploy"
-            return 1
+            # Remove all files and hidden files (except . and ..)
+            find . -mindepth 1 -maxdepth 1 ! -name '.' ! -name '..' -exec rm -rf {} + 2>/dev/null || true
+
+            log_success "Directorio limpiado"
+        else
+            log_info "Contenido actual:"
+            ls -la
+
+            # Check if it's just temporary files or lock files
+            local critical_files=$(ls -A . 2>/dev/null | grep -v -E '^(\.|lost\+found)' | wc -l)
+
+            if [ "$critical_files" -gt 0 ]; then
+                log_error "El directorio contiene archivos que podrían ser importantes"
+                log_error "Por seguridad, no se eliminará el contenido automáticamente"
+                log_error ""
+                log_error "Opciones:"
+                log_error "1. Agrega la variable de entorno: FORCE_CLEAN=true"
+                log_error "2. O ejecuta manualmente en el contenedor:"
+                log_error "   rm -rf /var/www/html/*"
+                log_error "   rm -rf /var/www/html/.[!.]*"
+                return 1
+            fi
+
+            log_info "Solo hay archivos ocultos, procediendo con la clonación..."
         fi
-
-        log_info "Solo hay archivos ocultos, procediendo con la clonación..."
     fi
 
     log_info "Clonando Bagisto $BAGISTO_VERSION..."

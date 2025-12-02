@@ -20,6 +20,7 @@ services:
       BAGISTO_VERSION: ${BAGISTO_VERSION:-v2.3.6}
       SEED_SAMPLE_DATA: ${SEED_SAMPLE_DATA:-false}
       CREATE_TEST_DB: ${CREATE_TEST_DB:-false}
+      FORCE_CLEAN: ${FORCE_CLEAN:-false}
       # Application URL (update this with your domain in Dokploy)
       APP_URL: ${APP_URL:-http://localhost}
       APP_ENV: ${APP_ENV:-local}
