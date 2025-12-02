@@ -23,10 +23,11 @@ services:
       SEED_SAMPLE_DATA: ${SEED_SAMPLE_DATA:-false}
       CREATE_TEST_DB: ${CREATE_TEST_DB:-false}
       FORCE_CLEAN: ${FORCE_CLEAN:-false}
+      FORCE_SETUP: ${FORCE_SETUP:-false}
       # Application configuration
-      APP_URL: ${APP_URL:-http://localhost}
-      APP_ENV: ${APP_ENV:-local}
-      APP_DEBUG: ${APP_DEBUG:-true}
+      APP_URL: ${APP_URL:-https://tienda.cfv.technology}
+      APP_ENV: ${APP_ENV:-production}
+      APP_DEBUG: ${APP_DEBUG:-false}
       APP_TIMEZONE: ${APP_TIMEZONE:-UTC}
       APP_LOCALE: ${APP_LOCALE:-en}
       APP_FALLBACK_LOCALE: ${APP_FALLBACK_LOCALE:-en}
@@ -73,6 +74,12 @@ services:
     image: nginx:latest
     expose:
       - "80" # Traefik/Dokploy hablará con este puerto interno
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.bagisto.rule=Host(`tienda.cfv.technology`)"
+      - "traefik.http.routers.bagisto.entrypoints=websecure"
+      - "traefik.http.routers.bagisto.tls.certresolver=letsencrypt"
+      - "traefik.http.services.bagisto.loadbalancer.server.port=80"
     volumes:
       - bagisto_data:/var/www/html/
       - ./.configs/nginx/nginx.conf:/etc/nginx/conf.d/default.conf
