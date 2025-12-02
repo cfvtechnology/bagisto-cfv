@@ -231,12 +231,31 @@ setup_bagisto_source() {
 
     log_info "Clonando Bagisto $BAGISTO_VERSION..."
 
-    if git clone https://github.com/bagisto/bagisto.git .; then
-        log_success "Bagisto clonado exitosamente"
+    # Try to clone Bagisto
+    if ! git clone https://github.com/bagisto/bagisto.git . 2>&1; then
+        log_error "Fallo al clonar Bagisto en el primer intento"
+
+        # If FORCE_CLEAN is true or we detect the specific git error, clean and retry
+        if [ "${FORCE_CLEAN:-false}" = "true" ]; then
+            log_warning "Limpiando directorio y reintentando..."
+
+            # Remove all content
+            find . -mindepth 1 -maxdepth 1 ! -name '.' ! -name '..' -exec rm -rf {} + 2>/dev/null || true
+
+            log_info "Reintentando clonación después de limpiar..."
+
+            if git clone https://github.com/bagisto/bagisto.git .; then
+                log_success "Bagisto clonado exitosamente después de limpiar"
+            else
+                log_error "Fallo al clonar Bagisto incluso después de limpiar"
+                return 1
+            fi
+        else
+            log_error "El directorio no está vacío. Configura FORCE_CLEAN=true para limpiarlo automáticamente"
+            return 1
+        fi
     else
-        log_error "Fallo al clonar Bagisto"
-        log_error "Esto puede ocurrir si el directorio no está completamente vacío"
-        return 1
+        log_success "Bagisto clonado exitosamente"
     fi
 
     log_info "Cambiando a versión $BAGISTO_VERSION..."
