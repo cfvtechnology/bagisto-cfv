@@ -289,6 +289,9 @@ setup_bagisto_source() {
 
             if run_as_user "git clone https://github.com/bagisto/bagisto.git ."; then
                 log_success "Bagisto clonado exitosamente después de limpiar"
+
+                # Fix ownership of .git directory after clone
+                chown -R "$APP_USER:www-data" .git 2>/dev/null || true
             else
                 log_error "Fallo al clonar Bagisto incluso después de limpiar"
                 log_error "Posibles causas:"
@@ -303,7 +306,14 @@ setup_bagisto_source() {
         fi
     else
         log_success "Bagisto clonado exitosamente"
+
+        # Fix ownership of .git directory after clone
+        chown -R "$APP_USER:www-data" .git 2>/dev/null || true
     fi
+
+    # Ensure all files belong to app user before git operations
+    log_info "Ajustando permisos del repositorio..."
+    chown -R "$APP_USER:www-data" . 2>/dev/null || true
 
     log_info "Cambiando a versión $BAGISTO_VERSION..."
 
