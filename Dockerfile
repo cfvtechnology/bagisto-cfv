@@ -29,6 +29,10 @@ RUN apt-get install -y libmagickwand-dev \
     && pecl install imagick \
     && docker-php-ext-enable imagick
 
+# redis extension install
+RUN pecl install redis \
+    && docker-php-ext-enable redis
+
 # intl extension configure and install
 RUN docker-php-ext-configure intl && docker-php-ext-install intl
 
