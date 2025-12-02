@@ -65,7 +65,7 @@ services:
       # Filesystem
       FILESYSTEM_DISK: ${FILESYSTEM_DISK:-public}
     volumes:
-      - ./workspace/:/var/www/html/
+      - bagisto_data:/var/www/html/
     depends_on:
       - mysql
 
@@ -74,7 +74,7 @@ services:
     expose:
       - "80" # Traefik/Dokploy hablará con este puerto interno
     volumes:
-      - ./workspace/:/var/www/html/
+      - bagisto_data:/var/www/html/
       - ./.configs/nginx/nginx.conf:/etc/nginx/conf.d/default.conf
     depends_on:
       - php-fpm
@@ -141,3 +141,6 @@ services:
     expose:
       - "8025"
       - "1025"
+
+volumes:
+  bagisto_data:
