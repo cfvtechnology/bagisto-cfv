@@ -351,18 +351,66 @@ configure_environment() {
     chown "$APP_USER:www-data" .env 2>/dev/null || true
     chmod 664 .env 2>/dev/null || true
 
-    # Set database configuration
-    log_info "Configurando variables de entorno..."
+    # Set all environment variables from Dokploy/docker-compose
+    log_info "Configurando variables de entorno desde variables de entorno del contenedor..."
 
-    sed -i "s/DB_HOST=.*/DB_HOST=${DB_HOST:-mysql}/" .env
-    sed -i "s/DB_DATABASE=.*/DB_DATABASE=${DB_DATABASE:-bagisto}/" .env
-    sed -i "s/DB_USERNAME=.*/DB_USERNAME=${DB_USERNAME:-root}/" .env
-    sed -i "s/DB_PASSWORD=.*/DB_PASSWORD=${DB_PASSWORD:-root}/" .env
+    # Database configuration
+    [ -n "${DB_HOST}" ] && sed -i "s/DB_HOST=.*/DB_HOST=${DB_HOST}/" .env
+    [ -n "${DB_PORT}" ] && sed -i "s/DB_PORT=.*/DB_PORT=${DB_PORT}/" .env
+    [ -n "${DB_DATABASE}" ] && sed -i "s/DB_DATABASE=.*/DB_DATABASE=${DB_DATABASE}/" .env
+    [ -n "${DB_USERNAME}" ] && sed -i "s/DB_USERNAME=.*/DB_USERNAME=${DB_USERNAME}/" .env
+    [ -n "${DB_PASSWORD}" ] && sed -i "s/DB_PASSWORD=.*/DB_PASSWORD=${DB_PASSWORD}/" .env
 
-    # Set APP_URL if provided
-    if [ -n "${APP_URL}" ]; then
-        sed -i "s#APP_URL=.*#APP_URL=${APP_URL}#" .env
-    fi
+    # Application configuration
+    [ -n "${APP_URL}" ] && sed -i "s#APP_URL=.*#APP_URL=${APP_URL}#" .env
+    [ -n "${APP_ENV}" ] && sed -i "s/APP_ENV=.*/APP_ENV=${APP_ENV}/" .env
+    [ -n "${APP_DEBUG}" ] && sed -i "s/APP_DEBUG=.*/APP_DEBUG=${APP_DEBUG}/" .env
+    [ -n "${APP_TIMEZONE}" ] && sed -i "s#APP_TIMEZONE=.*#APP_TIMEZONE=${APP_TIMEZONE}#" .env
+    [ -n "${APP_LOCALE}" ] && sed -i "s/APP_LOCALE=.*/APP_LOCALE=${APP_LOCALE}/" .env
+    [ -n "${APP_FALLBACK_LOCALE}" ] && sed -i "s/APP_FALLBACK_LOCALE=.*/APP_FALLBACK_LOCALE=${APP_FALLBACK_LOCALE}/" .env
+    [ -n "${APP_CURRENCY}" ] && sed -i "s/APP_CURRENCY=.*/APP_CURRENCY=${APP_CURRENCY}/" .env
+
+    # Redis configuration
+    [ -n "${REDIS_HOST}" ] && sed -i "s/REDIS_HOST=.*/REDIS_HOST=${REDIS_HOST}/" .env
+    [ -n "${REDIS_PORT}" ] && sed -i "s/REDIS_PORT=.*/REDIS_PORT=${REDIS_PORT}/" .env
+    [ -n "${REDIS_PASSWORD}" ] && sed -i "s/REDIS_PASSWORD=.*/REDIS_PASSWORD=${REDIS_PASSWORD}/" .env
+    [ -n "${CACHE_STORE}" ] && sed -i "s/CACHE_STORE=.*/CACHE_STORE=${CACHE_STORE}/" .env
+    [ -n "${SESSION_DRIVER}" ] && sed -i "s/SESSION_DRIVER=.*/SESSION_DRIVER=${SESSION_DRIVER}/" .env
+    [ -n "${QUEUE_CONNECTION}" ] && sed -i "s/QUEUE_CONNECTION=.*/QUEUE_CONNECTION=${QUEUE_CONNECTION}/" .env
+
+    # Mail configuration
+    [ -n "${MAIL_MAILER}" ] && sed -i "s/MAIL_MAILER=.*/MAIL_MAILER=${MAIL_MAILER}/" .env
+    [ -n "${MAIL_HOST}" ] && sed -i "s/MAIL_HOST=.*/MAIL_HOST=${MAIL_HOST}/" .env
+    [ -n "${MAIL_PORT}" ] && sed -i "s/MAIL_PORT=.*/MAIL_PORT=${MAIL_PORT}/" .env
+    [ -n "${MAIL_USERNAME}" ] && sed -i "s/MAIL_USERNAME=.*/MAIL_USERNAME=${MAIL_USERNAME}/" .env
+    [ -n "${MAIL_PASSWORD}" ] && sed -i "s/MAIL_PASSWORD=.*/MAIL_PASSWORD=${MAIL_PASSWORD}/" .env
+    [ -n "${MAIL_ENCRYPTION}" ] && sed -i "s/MAIL_ENCRYPTION=.*/MAIL_ENCRYPTION=${MAIL_ENCRYPTION}/" .env
+    [ -n "${MAIL_FROM_ADDRESS}" ] && sed -i "s/MAIL_FROM_ADDRESS=.*/MAIL_FROM_ADDRESS=${MAIL_FROM_ADDRESS}/" .env
+    [ -n "${MAIL_FROM_NAME}" ] && sed -i "s/MAIL_FROM_NAME=.*/MAIL_FROM_NAME=${MAIL_FROM_NAME}/" .env
+
+    # Admin configuration
+    [ -n "${ADMIN_MAIL_ADDRESS}" ] && sed -i "s/ADMIN_MAIL_ADDRESS=.*/ADMIN_MAIL_ADDRESS=${ADMIN_MAIL_ADDRESS}/" .env
+    [ -n "${ADMIN_MAIL_NAME}" ] && sed -i "s/ADMIN_MAIL_NAME=.*/ADMIN_MAIL_NAME=${ADMIN_MAIL_NAME}/" .env
+
+    # Elasticsearch configuration
+    [ -n "${ELASTICSEARCH_HOST}" ] && sed -i "s/ELASTICSEARCH_HOST=.*/ELASTICSEARCH_HOST=${ELASTICSEARCH_HOST}/" .env
+    [ -n "${ELASTICSEARCH_PORT}" ] && sed -i "s/ELASTICSEARCH_PORT=.*/ELASTICSEARCH_PORT=${ELASTICSEARCH_PORT}/" .env
+
+    # Logging
+    [ -n "${LOG_CHANNEL}" ] && sed -i "s/LOG_CHANNEL=.*/LOG_CHANNEL=${LOG_CHANNEL}/" .env
+    [ -n "${LOG_LEVEL}" ] && sed -i "s/LOG_LEVEL=.*/LOG_LEVEL=${LOG_LEVEL}/" .env
+
+    # Session
+    [ -n "${SESSION_LIFETIME}" ] && sed -i "s/SESSION_LIFETIME=.*/SESSION_LIFETIME=${SESSION_LIFETIME}/" .env
+    [ -n "${SESSION_ENCRYPT}" ] && sed -i "s/SESSION_ENCRYPT=.*/SESSION_ENCRYPT=${SESSION_ENCRYPT}/" .env
+
+    # Broadcasting
+    [ -n "${BROADCAST_CONNECTION}" ] && sed -i "s/BROADCAST_CONNECTION=.*/BROADCAST_CONNECTION=${BROADCAST_CONNECTION}/" .env
+
+    # Filesystem
+    [ -n "${FILESYSTEM_DISK}" ] && sed -i "s/FILESYSTEM_DISK=.*/FILESYSTEM_DISK=${FILESYSTEM_DISK}/" .env
+
+    log_success "Variables de entorno configuradas desde el contenedor"
 
     # Generate application key
     log_info "Generando APP_KEY..."
@@ -381,6 +429,35 @@ install_bagisto() {
     cd "$WORK_DIR"
 
     log_info "Verificando estado de la base de datos..."
+
+    # Test database write capability before migrations
+    log_info "Probando capacidad de escritura en MySQL..."
+    if ! php -r "
+        try {
+            \$dsn = 'mysql:host=${DB_HOST:-mysql};port=${DB_PORT:-3306};dbname=${DB_DATABASE:-bagisto}';
+            \$pdo = new PDO(\$dsn, '${DB_USERNAME:-root}', '${DB_PASSWORD:-root}');
+            \$pdo->exec('CREATE TABLE IF NOT EXISTS __test_write_capability (id INT)');
+            \$pdo->exec('DROP TABLE __test_write_capability');
+            exit(0);
+        } catch (PDOException \$e) {
+            file_put_contents('php://stderr', 'Error de MySQL: ' . \$e->getMessage() . PHP_EOL);
+            exit(1);
+        }
+    " 2>&1; then
+        log_error "MySQL no puede crear tablas"
+        log_error ""
+        log_error "Posibles causas:"
+        log_error "1. Espacio en disco lleno en el servidor"
+        log_error "2. Permisos incorrectos en el volumen de MySQL"
+        log_error "3. Corrupción del tablespace de InnoDB"
+        log_error ""
+        log_error "Verifica en Dokploy:"
+        log_error "- Espacio disponible en disco"
+        log_error "- Permisos del directorio ./.configs/data/mysql-data"
+        log_error "- Logs del contenedor MySQL para más detalles"
+        return 1
+    fi
+    log_success "MySQL puede escribir correctamente"
 
     # Check if migrations have been run
     if run_as_user "php artisan migrate:status" >/dev/null 2>&1; then

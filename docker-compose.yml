@@ -9,6 +9,8 @@ services:
         container_project_path: /var/www/html/
     image: bagisto-php-fpm
     environment:
+      # Internal configuration
+      APP_USER: ${APP_USER:-bagisto}
       # Database configuration
       DB_HOST: ${DB_HOST:-mysql}
       DB_PORT: ${DB_PORT:-3306}
@@ -21,10 +23,46 @@ services:
       SEED_SAMPLE_DATA: ${SEED_SAMPLE_DATA:-false}
       CREATE_TEST_DB: ${CREATE_TEST_DB:-false}
       FORCE_CLEAN: ${FORCE_CLEAN:-false}
-      # Application URL (update this with your domain in Dokploy)
+      # Application configuration
       APP_URL: ${APP_URL:-http://localhost}
       APP_ENV: ${APP_ENV:-local}
       APP_DEBUG: ${APP_DEBUG:-true}
+      APP_TIMEZONE: ${APP_TIMEZONE:-UTC}
+      APP_LOCALE: ${APP_LOCALE:-en}
+      APP_FALLBACK_LOCALE: ${APP_FALLBACK_LOCALE:-en}
+      APP_CURRENCY: ${APP_CURRENCY:-USD}
+      # Redis configuration
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-null}
+      CACHE_STORE: ${CACHE_STORE:-file}
+      SESSION_DRIVER: ${SESSION_DRIVER:-file}
+      QUEUE_CONNECTION: ${QUEUE_CONNECTION:-sync}
+      # Mail configuration
+      MAIL_MAILER: ${MAIL_MAILER:-smtp}
+      MAIL_HOST: ${MAIL_HOST:-mailpit}
+      MAIL_PORT: ${MAIL_PORT:-1025}
+      MAIL_USERNAME: ${MAIL_USERNAME:-null}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-null}
+      MAIL_ENCRYPTION: ${MAIL_ENCRYPTION:-null}
+      MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS:-noreply@example.com}
+      MAIL_FROM_NAME: ${MAIL_FROM_NAME:-Bagisto}
+      # Admin configuration
+      ADMIN_MAIL_ADDRESS: ${ADMIN_MAIL_ADDRESS:-admin@example.com}
+      ADMIN_MAIL_NAME: ${ADMIN_MAIL_NAME:-Admin}
+      # Elasticsearch configuration
+      ELASTICSEARCH_HOST: ${ELASTICSEARCH_HOST:-elasticsearch}
+      ELASTICSEARCH_PORT: ${ELASTICSEARCH_PORT:-9200}
+      # Logging
+      LOG_CHANNEL: ${LOG_CHANNEL:-stack}
+      LOG_LEVEL: ${LOG_LEVEL:-debug}
+      # Session
+      SESSION_LIFETIME: ${SESSION_LIFETIME:-120}
+      SESSION_ENCRYPT: ${SESSION_ENCRYPT:-false}
+      # Broadcasting
+      BROADCAST_CONNECTION: ${BROADCAST_CONNECTION:-log}
+      # Filesystem
+      FILESYSTEM_DISK: ${FILESYSTEM_DISK:-public}
     volumes:
       - ./workspace/:/var/www/html/
     depends_on:
