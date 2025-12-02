@@ -192,6 +192,12 @@ docker exec <container-name> cat /var/www/html/.bagisto-setup-complete
 docker logs <container-name>
 ```
 
+**Getting "MySQL no está disponible" error?**
+- 📖 See `TROUBLESHOOTING.md` for detailed solutions
+- Verify MySQL service is running
+- Check environment variables
+- Review MySQL logs for errors
+
 ## After installation
 
 - To log in as admin.

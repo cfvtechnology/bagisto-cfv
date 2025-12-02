@@ -113,14 +113,38 @@ volumes:
 
 ### 7. Monitorear Instalación
 
-1. Ve a **Logs** en Dokploy
-2. Selecciona el servicio `php-fpm`
-3. Observa el progreso de la instalación:
+**⚠️ IMPORTANTE:** Antes de revisar los logs, asegúrate de que TODOS los servicios estén corriendo.
+
+**Paso 1: Verificar Estado de Servicios**
+
+1. Ve a tu proyecto en Dokploy
+2. Verifica que estos servicios estén en estado **"Running"**:
+   - ✅ `mysql` ← **CRÍTICO - debe estar corriendo primero**
+   - ✅ `redis`
+   - ✅ `elasticsearch`
+   - ✅ `php-fpm`
+   - ✅ `nginx`
+
+3. **Si `mysql` NO está corriendo:**
+   - Haz click en el servicio MySQL
+   - Revisa sus logs para ver si hay errores
+   - Espera 1-2 minutos (MySQL puede tardar en iniciar)
+   - Si persiste el problema, verifica memoria y recursos del servidor
+
+**Paso 2: Monitorear Logs de Instalación**
+
+1. Una vez que todos los servicios estén "Running":
+2. Ve a **Logs** en Dokploy
+3. Selecciona el servicio `php-fpm`
+4. Observa el progreso de la instalación:
 
 ```
 [INFO] Iniciando instalación automatizada de Bagisto...
 [INFO] Esperando a que MySQL esté disponible...
-[SUCCESS] MySQL está listo
+[INFO] Configuración de conexión:
+[INFO]   - DB_HOST: mysql
+[INFO]   - DB_PORT: 3306
+[SUCCESS] MySQL está listo y aceptando conexiones
 [INFO] Verificando/creando base de datos: bagisto
 [SUCCESS] Base de datos 'bagisto' verificada/creada
 [INFO] Clonando Bagisto v2.3.6...
@@ -128,6 +152,11 @@ volumes:
 ...
 [SUCCESS] Instalación de Bagisto completada exitosamente!
 ```
+
+**Si ves el error: "MySQL no está disponible después de 60 intentos"**
+- 📖 Consulta el archivo `TROUBLESHOOTING.md` en el repositorio
+- Verifica que el servicio `mysql` esté corriendo en Dokploy
+- Revisa las variables de entorno (especialmente `DB_HOST=mysql`)
 
 ## 🔍 Verificación Post-Despliegue
 

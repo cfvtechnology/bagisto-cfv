@@ -74,21 +74,89 @@ check_if_installed() {
 wait_for_mysql() {
     log_info "Esperando a que MySQL esté disponible..."
 
-    local max_attempts=30
+    # Debug: Print environment variables
+    log_info "Configuración de conexión:"
+    log_info "  - DB_HOST: ${DB_HOST:-mysql}"
+    log_info "  - DB_PORT: ${DB_PORT:-3306}"
+    log_info "  - DB_USERNAME: ${DB_USERNAME:-root}"
+    log_info "  - DB_DATABASE: ${DB_DATABASE:-bagisto}"
+
+    local max_attempts=60  # Increased from 30 to 60
     local attempt=1
+    local sleep_time=3  # Increased from 2 to 3 seconds
+
+    # First, check if we can reach the host
+    log_info "Verificando conectividad de red..."
+    if command -v nc >/dev/null 2>&1; then
+        if nc -z "${DB_HOST:-mysql}" "${DB_PORT:-3306}" 2>/dev/null; then
+            log_success "Puerto ${DB_PORT:-3306} en ${DB_HOST:-mysql} es accesible"
+        else
+            log_warning "No se puede conectar al puerto ${DB_PORT:-3306} en ${DB_HOST:-mysql}"
+            log_info "Esto puede ser normal si MySQL aún está iniciando..."
+        fi
+    fi
+
+    # Try to resolve the hostname
+    log_info "Intentando resolver hostname ${DB_HOST:-mysql}..."
+    if command -v getent >/dev/null 2>&1; then
+        if getent hosts "${DB_HOST:-mysql}" >/dev/null 2>&1; then
+            local ip=$(getent hosts "${DB_HOST:-mysql}" | awk '{print $1}')
+            log_success "Hostname resuelto a IP: $ip"
+        else
+            log_warning "No se pudo resolver el hostname ${DB_HOST:-mysql}"
+            log_info "Esperando a que el servicio esté disponible en la red Docker..."
+        fi
+    fi
 
     while [ $attempt -le $max_attempts ]; do
-        if mysql -h"${DB_HOST:-mysql}" -u"${DB_USERNAME:-root}" -p"${DB_PASSWORD:-root}" -e "SELECT 1" >/dev/null 2>&1; then
-            log_success "MySQL está listo"
+        # Try to connect to MySQL
+        if mysql -h"${DB_HOST:-mysql}" -P"${DB_PORT:-3306}" -u"${DB_USERNAME:-root}" -p"${DB_PASSWORD:-root}" -e "SELECT 1" >/dev/null 2>&1; then
+            log_success "MySQL está listo y aceptando conexiones"
             return 0
         fi
 
-        log_info "Intento $attempt/$max_attempts - MySQL no disponible aún..."
-        sleep 2
+        # Show progress every 5 attempts
+        if [ $((attempt % 5)) -eq 0 ]; then
+            log_info "Intento $attempt/$max_attempts - MySQL aún no disponible..."
+
+            # Additional diagnostics every 10 attempts
+            if [ $((attempt % 10)) -eq 0 ]; then
+                log_info "Diagnóstico adicional:"
+
+                # Check if MySQL port is open
+                if command -v nc >/dev/null 2>&1; then
+                    if nc -z "${DB_HOST:-mysql}" "${DB_PORT:-3306}" 2>/dev/null; then
+                        log_info "  ✓ Puerto MySQL es accesible (MySQL puede estar iniciando)"
+                    else
+                        log_warning "  ✗ Puerto MySQL no es accesible (contenedor puede no estar listo)"
+                    fi
+                fi
+
+                # Try to ping the host
+                if command -v ping >/dev/null 2>&1; then
+                    if ping -c 1 -W 1 "${DB_HOST:-mysql}" >/dev/null 2>&1; then
+                        log_info "  ✓ Host ${DB_HOST:-mysql} responde a ping"
+                    else
+                        log_warning "  ✗ Host ${DB_HOST:-mysql} no responde a ping"
+                    fi
+                fi
+            fi
+        fi
+
+        sleep $sleep_time
         ((attempt++))
     done
 
-    log_error "MySQL no está disponible después de $max_attempts intentos"
+    log_error "MySQL no está disponible después de $max_attempts intentos (${max_attempts}x${sleep_time}s = $((max_attempts * sleep_time))s total)"
+    log_error ""
+    log_error "Pasos para diagnosticar:"
+    log_error "1. Verifica que el servicio 'mysql' esté corriendo en Dokploy"
+    log_error "2. Revisa los logs del contenedor MySQL"
+    log_error "3. Verifica que DB_HOST=${DB_HOST:-mysql} sea correcto"
+    log_error "4. Verifica las credenciales: DB_USERNAME=${DB_USERNAME:-root}"
+    log_error "5. Intenta ejecutar manualmente:"
+    log_error "   docker exec -it <mysql-container> mysql -u${DB_USERNAME:-root} -p"
+
     return 1
 }
 
