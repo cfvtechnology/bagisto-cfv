@@ -32,6 +32,16 @@ WORK_DIR="/var/www/html"
 ENV_FILE="${WORK_DIR}/.env"
 VENDOR_DIR="${WORK_DIR}/vendor"
 LOCK_FILE="${WORK_DIR}/.bagisto-setup-complete"
+APP_USER="${APP_USER:-bagisto}"
+
+# Helper function to run commands as the app user
+run_as_user() {
+    if [ "$(whoami)" = "root" ]; then
+        su - "$APP_USER" -c "cd $WORK_DIR && $*"
+    else
+        bash -c "cd $WORK_DIR && $*"
+    fi
+}
 
 ################################################################################
 # Helper Functions
@@ -243,29 +253,38 @@ setup_bagisto_source() {
         # If FORCE_CLEAN is true or we detect the specific git error, clean and retry
         if [ "${FORCE_CLEAN:-false}" = "true" ]; then
             log_warning "Limpiando directorio y reintentando..."
+            log_info "Usuario actual: $(whoami)"
 
-            # More aggressive cleanup
-            # First, remove .git directory if it exists
-            if [ -d ".git" ]; then
-                log_info "Eliminando directorio .git existente..."
-                rm -rf .git 2>/dev/null || true
-            fi
+            # More aggressive cleanup - remove everything including .gitignore
+            log_info "Eliminando todo el contenido del directorio..."
 
-            # Remove all visible files
-            log_info "Eliminando archivos visibles..."
-            rm -rf * 2>/dev/null || true
+            # Remove .git directory if it exists
+            rm -rf .git 2>/dev/null || true
 
-            # Remove all hidden files and directories (except . and ..)
-            log_info "Eliminando archivos ocultos..."
-            find . -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>/dev/null || true
+            # Remove .gitignore specifically
+            rm -f .gitignore 2>/dev/null || true
+
+            # Remove all files and directories (visible and hidden)
+            rm -rf ..?* .[!.]* * 2>/dev/null || true
+
+            # Final cleanup with find (belt and suspenders)
+            find . -mindepth 1 -delete 2>/dev/null || true
 
             # Verify directory is empty
             log_info "Contenido después de limpiar:"
             ls -la 2>/dev/null || echo "Directorio vacío"
 
+            local remaining_files=$(ls -A 2>/dev/null | wc -l)
+            if [ "$remaining_files" -gt 0 ]; then
+                log_warning "Aún quedan $remaining_files archivos en el directorio"
+            fi
+
             log_info "Reintentando clonación después de limpiar..."
 
-            if git clone https://github.com/bagisto/bagisto.git .; then
+            # Fix ownership before cloning as user
+            chown -R "$APP_USER:www-data" . 2>/dev/null || true
+
+            if run_as_user "git clone https://github.com/bagisto/bagisto.git ."; then
                 log_success "Bagisto clonado exitosamente después de limpiar"
             else
                 log_error "Fallo al clonar Bagisto incluso después de limpiar"
@@ -284,7 +303,7 @@ setup_bagisto_source() {
     fi
 
     log_info "Cambiando a versión $BAGISTO_VERSION..."
-    if git reset --hard "$BAGISTO_VERSION"; then
+    if run_as_user "git reset --hard $BAGISTO_VERSION"; then
         log_success "Versión $BAGISTO_VERSION configurada"
     else
         log_error "Fallo al cambiar a versión $BAGISTO_VERSION"
@@ -303,7 +322,7 @@ install_dependencies() {
 
     log_info "Instalando dependencias de Composer..."
 
-    if composer install --no-interaction --prefer-dist --optimize-autoloader; then
+    if run_as_user "composer install --no-interaction --prefer-dist --optimize-autoloader"; then
         log_success "Dependencias instaladas exitosamente"
     else
         log_error "Fallo al instalar dependencias de Composer"
@@ -343,7 +362,7 @@ configure_environment() {
 
     # Generate application key
     log_info "Generando APP_KEY..."
-    if php artisan key:generate --force; then
+    if run_as_user "php artisan key:generate --force"; then
         log_success "APP_KEY generada exitosamente"
     else
         log_error "Fallo al generar APP_KEY"
@@ -360,11 +379,11 @@ install_bagisto() {
     log_info "Verificando estado de la base de datos..."
 
     # Check if migrations have been run
-    if php artisan migrate:status >/dev/null 2>&1; then
+    if run_as_user "php artisan migrate:status" >/dev/null 2>&1; then
         log_info "Las migraciones ya fueron ejecutadas"
     else
         log_info "Ejecutando migraciones de base de datos..."
-        if php artisan migrate --force; then
+        if run_as_user "php artisan migrate --force"; then
             log_success "Migraciones ejecutadas exitosamente"
         else
             log_error "Fallo al ejecutar migraciones"
@@ -373,7 +392,7 @@ install_bagisto() {
     fi
 
     log_info "Ejecutando instalador de Bagisto..."
-    if php artisan bagisto:install --skip-env-check --skip-admin-creation; then
+    if run_as_user "php artisan bagisto:install --skip-env-check --skip-admin-creation"; then
         log_success "Bagisto instalado exitosamente"
     else
         log_error "Fallo al ejecutar el instalador de Bagisto"
@@ -388,7 +407,7 @@ seed_sample_data() {
     if [ "${SEED_SAMPLE_DATA:-false}" = "true" ]; then
         log_info "Cargando datos de ejemplo..."
 
-        if php artisan db:seed --class="Webkul\Installer\Database\Seeders\ProductTableSeeder"; then
+        if run_as_user "php artisan db:seed --class='Webkul\Installer\Database\Seeders\ProductTableSeeder'"; then
             log_success "Datos de ejemplo cargados"
         else
             log_warning "Fallo al cargar datos de ejemplo (no crítico)"
@@ -428,7 +447,7 @@ create_storage_link() {
 
     if [ ! -L "public/storage" ]; then
         log_info "Creando enlace simbólico de storage..."
-        if php artisan storage:link; then
+        if run_as_user "php artisan storage:link"; then
             log_success "Enlace de storage creado"
         else
             log_warning "No se pudo crear el enlace de storage (puede no ser necesario)"

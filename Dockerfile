@@ -72,14 +72,12 @@ RUN useradd -G www-data,root -u ${APP_UID} -d /home/${APP_USER} ${APP_USER} && \
 RUN chmod -R 775 ${container_project_path} && \
     chown -R ${APP_USER}:www-data ${container_project_path}
 
-# changing user
-USER ${APP_USER}
-
 # setting work directory
 WORKDIR ${container_project_path}
 
-# set entrypoint
+# set entrypoint (will run as root to handle permissions)
 ENTRYPOINT ["/var/www/scripts/entrypoint.sh"]
 
 # default command (can be overridden)
+# Note: php-fpm will run as ${APP_USER} based on pool configuration
 CMD ["php-fpm"]

@@ -85,15 +85,22 @@ handle_setup() {
 main() {
     log_info "Iniciando contenedor Bagisto PHP-FPM..."
 
-    # Run setup if needed
+    # Run setup if needed (as root to handle file permissions)
     handle_setup
+
+    # Fix ownership of the work directory after setup
+    if [ -d "/var/www/html" ]; then
+        log_info "Ajustando permisos del directorio de trabajo..."
+        chown -R ${APP_USER:-bagisto}:www-data /var/www/html 2>/dev/null || true
+        chmod -R 775 /var/www/html 2>/dev/null || true
+    fi
 
     # Execute any additional commands passed to entrypoint
     if [ $# -gt 0 ]; then
         log_info "Ejecutando comando: $*"
         exec "$@"
     else
-        # Start php-fpm by default
+        # Start php-fpm by default (will run as APP_USER based on pool config)
         log_success "Iniciando PHP-FPM..."
         exec php-fpm
     fi
