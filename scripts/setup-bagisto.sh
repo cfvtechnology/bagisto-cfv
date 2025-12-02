@@ -184,14 +184,17 @@ setup_bagisto_source() {
 
         # Verify we're on the correct version
         if [ -d ".git" ]; then
-            local current_version=$(git describe --tags --exact-match 2>/dev/null || git rev-parse --short HEAD)
+            # Configure git safe.directory
+            run_as_user "git config --global --add safe.directory /var/www/html" 2>/dev/null || true
+
+            local current_version=$(run_as_user "git describe --tags --exact-match 2>/dev/null || git rev-parse --short HEAD")
             log_info "Versión actual: $current_version"
 
             # If version doesn't match, update it
             if [ "$current_version" != "$BAGISTO_VERSION" ]; then
                 log_info "Actualizando a versión $BAGISTO_VERSION..."
-                git fetch --tags 2>/dev/null || true
-                if git reset --hard "$BAGISTO_VERSION" 2>/dev/null; then
+                run_as_user "git fetch --tags" 2>/dev/null || true
+                if run_as_user "git reset --hard $BAGISTO_VERSION" 2>/dev/null; then
                     log_success "Versión actualizada a $BAGISTO_VERSION"
                 else
                     log_warning "No se pudo actualizar la versión (continuando con versión actual)"
@@ -303,6 +306,10 @@ setup_bagisto_source() {
     fi
 
     log_info "Cambiando a versión $BAGISTO_VERSION..."
+
+    # Configure git safe.directory to avoid ownership issues
+    run_as_user "git config --global --add safe.directory /var/www/html" 2>/dev/null || true
+
     if run_as_user "git reset --hard $BAGISTO_VERSION"; then
         log_success "Versión $BAGISTO_VERSION configurada"
     else
