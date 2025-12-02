@@ -386,11 +386,20 @@ configure_environment() {
     [ -n "${MAIL_PASSWORD}" ] && sed -i "s/MAIL_PASSWORD=.*/MAIL_PASSWORD=${MAIL_PASSWORD}/" .env
     [ -n "${MAIL_ENCRYPTION}" ] && sed -i "s/MAIL_ENCRYPTION=.*/MAIL_ENCRYPTION=${MAIL_ENCRYPTION}/" .env
     [ -n "${MAIL_FROM_ADDRESS}" ] && sed -i "s/MAIL_FROM_ADDRESS=.*/MAIL_FROM_ADDRESS=${MAIL_FROM_ADDRESS}/" .env
-    [ -n "${MAIL_FROM_NAME}" ] && sed -i "s/MAIL_FROM_NAME=.*/MAIL_FROM_NAME=${MAIL_FROM_NAME}/" .env
+    # MAIL_FROM_NAME needs quotes if it contains spaces
+    if [ -n "${MAIL_FROM_NAME}" ]; then
+        # Escape any existing quotes and wrap in quotes
+        local mail_name=$(echo "${MAIL_FROM_NAME}" | sed 's/"/\\"/g')
+        sed -i "s/MAIL_FROM_NAME=.*/MAIL_FROM_NAME=\"${mail_name}\"/" .env
+    fi
 
     # Admin configuration
     [ -n "${ADMIN_MAIL_ADDRESS}" ] && sed -i "s/ADMIN_MAIL_ADDRESS=.*/ADMIN_MAIL_ADDRESS=${ADMIN_MAIL_ADDRESS}/" .env
-    [ -n "${ADMIN_MAIL_NAME}" ] && sed -i "s/ADMIN_MAIL_NAME=.*/ADMIN_MAIL_NAME=${ADMIN_MAIL_NAME}/" .env
+    # ADMIN_MAIL_NAME needs quotes if it contains spaces
+    if [ -n "${ADMIN_MAIL_NAME}" ]; then
+        local admin_name=$(echo "${ADMIN_MAIL_NAME}" | sed 's/"/\\"/g')
+        sed -i "s/ADMIN_MAIL_NAME=.*/ADMIN_MAIL_NAME=\"${admin_name}\"/" .env
+    fi
 
     # Elasticsearch configuration
     [ -n "${ELASTICSEARCH_HOST}" ] && sed -i "s/ELASTICSEARCH_HOST=.*/ELASTICSEARCH_HOST=${ELASTICSEARCH_HOST}/" .env
