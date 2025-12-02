@@ -327,6 +327,18 @@ install_dependencies() {
         return 0
     fi
 
+    # Create and set permissions for Laravel directories before composer install
+    log_info "Preparando directorios de Laravel..."
+
+    # Create directories if they don't exist
+    mkdir -p storage/logs storage/framework/{sessions,views,cache} bootstrap/cache 2>/dev/null || true
+
+    # Set ownership to app user
+    chown -R "$APP_USER:www-data" storage bootstrap/cache 2>/dev/null || true
+
+    # Set permissions
+    chmod -R 775 storage bootstrap/cache 2>/dev/null || true
+
     log_info "Instalando dependencias de Composer..."
 
     if run_as_user "composer install --no-interaction --prefer-dist --optimize-autoloader"; then
