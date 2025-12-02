@@ -171,15 +171,51 @@ setup_bagisto_source() {
     # Check if we already have Bagisto files
     if [ -f "composer.json" ] && grep -q "bagisto/bagisto" composer.json 2>/dev/null; then
         log_info "Código fuente de Bagisto ya existe"
+
+        # Verify we're on the correct version
+        if [ -d ".git" ]; then
+            local current_version=$(git describe --tags --exact-match 2>/dev/null || git rev-parse --short HEAD)
+            log_info "Versión actual: $current_version"
+
+            # If version doesn't match, update it
+            if [ "$current_version" != "$BAGISTO_VERSION" ]; then
+                log_info "Actualizando a versión $BAGISTO_VERSION..."
+                git fetch --tags 2>/dev/null || true
+                if git reset --hard "$BAGISTO_VERSION" 2>/dev/null; then
+                    log_success "Versión actualizada a $BAGISTO_VERSION"
+                else
+                    log_warning "No se pudo actualizar la versión (continuando con versión actual)"
+                fi
+            fi
+        fi
+
         return 0
     fi
 
-    # Check if directory is empty or only has .gitignore
-    if [ -n "$(ls -A . 2>/dev/null | grep -v '^\.gitignore$')" ]; then
-        log_error "El directorio $WORK_DIR no está vacío y no contiene Bagisto"
+    # Check if directory is empty or only has safe files to ignore
+    local file_count=$(ls -A . 2>/dev/null | grep -v -E '^(\.gitignore|\.bagisto-setup-complete)$' | wc -l)
+
+    if [ "$file_count" -gt 0 ]; then
+        log_warning "El directorio $WORK_DIR no está vacío"
         log_info "Contenido actual:"
         ls -la
-        return 1
+
+        # Check if it's just temporary files or lock files
+        local critical_files=$(ls -A . 2>/dev/null | grep -v -E '^(\.|lost\+found)' | wc -l)
+
+        if [ "$critical_files" -gt 0 ]; then
+            log_error "El directorio contiene archivos que podrían ser importantes"
+            log_error "Por seguridad, no se eliminará el contenido automáticamente"
+            log_error ""
+            log_error "Opciones:"
+            log_error "1. Si estás seguro de eliminar el contenido, ejecuta manualmente:"
+            log_error "   docker exec <container> rm -rf /var/www/html/*"
+            log_error "   docker exec <container> rm -rf /var/www/html/.[!.]*"
+            log_error "2. O monta un volumen vacío en Dokploy"
+            return 1
+        fi
+
+        log_info "Solo hay archivos ocultos, procediendo con la clonación..."
     fi
 
     log_info "Clonando Bagisto $BAGISTO_VERSION..."
@@ -188,6 +224,7 @@ setup_bagisto_source() {
         log_success "Bagisto clonado exitosamente"
     else
         log_error "Fallo al clonar Bagisto"
+        log_error "Esto puede ocurrir si el directorio no está completamente vacío"
         return 1
     fi
 
