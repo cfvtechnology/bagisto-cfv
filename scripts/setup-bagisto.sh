@@ -230,6 +230,11 @@ setup_bagisto_source() {
     fi
 
     log_info "Clonando Bagisto $BAGISTO_VERSION..."
+    log_info "Directorio de trabajo: $(pwd)"
+
+    # Show what's in the directory before cloning
+    log_info "Contenido actual del directorio:"
+    ls -la 2>/dev/null || echo "No se puede listar el directorio"
 
     # Try to clone Bagisto
     if ! git clone https://github.com/bagisto/bagisto.git . 2>&1; then
@@ -239,8 +244,24 @@ setup_bagisto_source() {
         if [ "${FORCE_CLEAN:-false}" = "true" ]; then
             log_warning "Limpiando directorio y reintentando..."
 
-            # Remove all content
-            find . -mindepth 1 -maxdepth 1 ! -name '.' ! -name '..' -exec rm -rf {} + 2>/dev/null || true
+            # More aggressive cleanup
+            # First, remove .git directory if it exists
+            if [ -d ".git" ]; then
+                log_info "Eliminando directorio .git existente..."
+                rm -rf .git 2>/dev/null || true
+            fi
+
+            # Remove all visible files
+            log_info "Eliminando archivos visibles..."
+            rm -rf * 2>/dev/null || true
+
+            # Remove all hidden files and directories (except . and ..)
+            log_info "Eliminando archivos ocultos..."
+            find . -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>/dev/null || true
+
+            # Verify directory is empty
+            log_info "Contenido después de limpiar:"
+            ls -la 2>/dev/null || echo "Directorio vacío"
 
             log_info "Reintentando clonación después de limpiar..."
 
@@ -248,6 +269,10 @@ setup_bagisto_source() {
                 log_success "Bagisto clonado exitosamente después de limpiar"
             else
                 log_error "Fallo al clonar Bagisto incluso después de limpiar"
+                log_error "Posibles causas:"
+                log_error "1. Permisos insuficientes del usuario $(whoami)"
+                log_error "2. Volumen montado con permisos incorrectos"
+                log_error "3. Archivos bloqueados por otro proceso"
                 return 1
             fi
         else
