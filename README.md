@@ -30,42 +30,167 @@ However, there may be some specific cases where adjustments are necessary. We re
 
 ## Installation
 
-- This is a straightforward repository with no complex configurations. Just update the `docker-compose.yml` file if needed, and you’re all set!
+### Step 1: Configure Environment Variables
 
-- Adjust your services as needed. For example, most Linux users have a UID of 1000. If your UID is different, make sure to update it according to your host machine.
+This repository uses environment variables for configuration to keep sensitive data secure.
 
-  ```yml
-  services:
-    php-fpm:
-      build:
-        args:
-          container_project_path: /var/www/html/
-          uid: 1000 # add your uid here
-          user: $USER
-        context: .
-        dockerfile: ./Dockerfile
-      image: php-fpm
-      ports:
-        - "5173:5173" # Vite dev server port
-      volumes:
-        - ./workspace/:/var/www/html/
+1. **Copy the example environment file:**
 
-    nginx:
-      image: nginx:latest
-      ports:
-        - "80:80" # adjust your port here, if you want to change
-      volumes:
-        - ./workspace/:/var/www/html/
-        - ./.configs/nginx/nginx.conf:/etc/nginx/conf.d/default.conf
-      depends_on:
-        - php-fpm
-  ```
+   ```sh
+   cp .env.example .env
+   ```
 
-- In this repository, the initial focus was on meeting all project requirements. Whether your project is new or pre-existing, you can easily copy and paste it into the designated workspace directory. If you’re unsure where to begin, a shell script has been provided to streamline the setup process for you. To install and set up everything, simply run:
+2. **Edit the `.env` file** and update the values according to your needs:
 
-  ```sh
-  sh setup.sh
-  ```
+   ```env
+   # Update these values for your environment
+   APP_URL=http://localhost
+   DB_PASSWORD=your_secure_password_here
+   AUTO_SETUP=true
+   ```
+
+   > **Important:** Never commit the `.env` file to the repository! It's already included in `.gitignore`.
+
+### Step 2: Adjust Services (if needed)
+
+- Most Linux users have a UID of 1000. If your UID is different, update it in the `.env` file:
+
+   ```env
+   APP_UID=1001  # Replace with your UID (run 'id -u' to find it)
+   APP_USER=myuser  # Replace with your username
+   ```
+
+### Step 3: Start the Services
+
+Once you have configured your `.env` file:
+
+```sh
+docker-compose up -d
+```
+
+The automated setup will:
+- Wait for MySQL to be ready
+- Create the database
+- Clone Bagisto source code
+- Install dependencies
+- Configure the application
+- Run migrations and seeders
+
+> **Note:** The first startup may take several minutes as it downloads images and installs Bagisto.
+
+## Automated Setup for Dokploy / Production
+
+This repository includes automated setup scripts designed for deployment platforms like **Dokploy** that manage Docker Compose orchestration.
+
+### How It Works
+
+The automated setup runs inside the `php-fpm` container and handles:
+
+- ✅ Waiting for MySQL to be ready
+- ✅ Creating the database automatically
+- ✅ Cloning Bagisto source code
+- ✅ Installing Composer dependencies
+- ✅ Configuring `.env` file
+- ✅ Running migrations and Bagisto installer
+- ✅ Setting proper file permissions
+
+### Environment Variables
+
+Configure these in your Dokploy environment settings or `docker-compose.yml`:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `AUTO_SETUP` | `true` | Enable automatic setup on first container start |
+| `BAGISTO_VERSION` | `v2.3.6` | Bagisto version to install |
+| `SEED_SAMPLE_DATA` | `false` | Load sample product data |
+| `CREATE_TEST_DB` | `false` | Create testing database |
+| `APP_URL` | `http://localhost` | Your application URL (update with your domain) |
+| `DB_HOST` | `mysql` | Database host |
+| `DB_DATABASE` | `bagisto` | Database name |
+| `DB_USERNAME` | `root` | Database username |
+| `DB_PASSWORD` | `root` | Database password |
+| `FORCE_SETUP` | `false` | Force reinstallation (deletes lock file) |
+| `SKIP_SETUP` | `false` | Skip setup completely |
+
+### Deployment in Dokploy
+
+1. **Create a new service** in Dokploy pointing to this repository
+
+2. **Configure environment variables** in Dokploy UI (see `.env.dokploy.example` for reference):
+
+   **Required variables:**
+   - `APP_URL` - Your domain (e.g., `https://tienda.cfv.technology`)
+   - `DB_PASSWORD` - A strong password for MySQL (generate with `openssl rand -base64 32`)
+   - `APP_ENV` - Set to `production`
+   - `APP_DEBUG` - Set to `false`
+
+   **Optional variables:**
+   - `SEED_SAMPLE_DATA=true` - Enable if you want demo products
+   - `BAGISTO_VERSION=v2.3.6` - Specify Bagisto version
+   - `AUTO_SETUP=true` - Keep enabled for automatic installation
+
+   > **Security Note:** Dokploy's environment variables are NOT committed to the repository, keeping your credentials safe.
+
+3. **Deploy the service** - Bagisto will install automatically on first run
+
+4. **Monitor the installation** via Dokploy logs:
+   ```bash
+   # In Dokploy UI, go to: Service → Logs
+   # You'll see the installation progress
+   ```
+
+5. **Access your store** at your configured domain
+
+### Manual Setup (if needed)
+
+If you need to run setup manually or troubleshoot:
+
+```bash
+# Access the php-fpm container
+docker exec -it <container-name> bash
+
+# Run setup script
+bash /var/www/scripts/setup-bagisto.sh
+```
+
+### Reinstalling Bagisto
+
+To force a fresh installation:
+
+```bash
+# Method 1: Use environment variable
+# In Dokploy, set: FORCE_SETUP=true and redeploy
+
+# Method 2: Delete lock file manually
+docker exec -it <container-name> rm /var/www/html/.bagisto-setup-complete
+docker restart <container-name>
+```
+
+### Troubleshooting
+
+**Setup not running automatically?**
+- Check that `AUTO_SETUP=true` in environment variables
+- Verify MySQL container is running and accessible
+- Check container logs for errors
+
+**Database connection failed?**
+- Ensure MySQL service is named `mysql` in docker-compose.yml
+- Verify `DB_HOST`, `DB_USERNAME`, and `DB_PASSWORD` are correct
+- Wait a few seconds for MySQL to fully initialize
+
+**Permission errors?**
+- The container runs as user `bagisto` (UID 1000 by default)
+- Ensure the workspace volume has proper permissions
+- Check `uid` argument in docker-compose.yml matches your environment
+
+**Need to check installation status?**
+```bash
+# Check if setup completed
+docker exec <container-name> cat /var/www/html/.bagisto-setup-complete
+
+# View setup logs
+docker logs <container-name>
+```
 
 ## After installation
 
@@ -84,6 +209,19 @@ However, there may be some specific cases where adjustments are necessary. We re
   http(s):/your_server_endpoint/customer/register
   ```
 
+> [!IMPORTANT]
+> **Change the default admin credentials immediately after first login!**
+
+## Traditional Setup (Legacy)
+
+If you prefer the traditional manual setup process:
+
+```sh
+sh setup.sh
+```
+
+This script will set up everything step by step (Docker Compose must be available on host).
+
 ## Already Docker Expert?
 
 - You can use this repository as your workspace. To build your container, simply run the following command:
@@ -98,6 +236,25 @@ However, there may be some specific cases where adjustments are necessary. We re
   docker-compose up -d
   ```
 
-- Now, you can access the container's shell and install [Bagisto](https://github.com/bagisto/bagisto).
+- The automated setup will run on first start if `AUTO_SETUP=true`
+
+## Scripts Reference
+
+### `/var/www/scripts/setup-bagisto.sh`
+
+Main installation script. Features:
+- Idempotent (safe to run multiple times)
+- Error handling and validation
+- Colored output for easy debugging
+- Lock file mechanism to prevent re-installation
+
+### `/var/www/scripts/entrypoint.sh`
+
+Container entrypoint that handles:
+- Automatic setup trigger
+- Environment variable configuration
+- PHP-FPM startup
+
+## Support
 
 In case of any issues or queries, raise your ticket at [Webkul Support](https://webkul.uvdesk.com/en/customer/create-ticket/).

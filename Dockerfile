@@ -55,6 +55,14 @@ ARG APP_USER=bagisto
 # copy php-fpm pool configuration
 COPY ./.configs/nginx/pools/www.cnf /usr/local/etc/php-fpm.d/www.conf
 
+# copy automation scripts
+COPY ./scripts/setup-bagisto.sh /var/www/scripts/setup-bagisto.sh
+COPY ./scripts/entrypoint.sh /var/www/scripts/entrypoint.sh
+
+# set executable permissions for scripts
+RUN chmod +x /var/www/scripts/setup-bagisto.sh && \
+    chmod +x /var/www/scripts/entrypoint.sh
+
 # adding user
 RUN useradd -G www-data,root -u ${APP_UID} -d /home/${APP_USER} ${APP_USER} && \
     mkdir -p /home/${APP_USER}/.composer && \
@@ -69,3 +77,9 @@ USER ${APP_USER}
 
 # setting work directory
 WORKDIR ${container_project_path}
+
+# set entrypoint
+ENTRYPOINT ["/var/www/scripts/entrypoint.sh"]
+
+# default command (can be overridden)
+CMD ["php-fpm"]

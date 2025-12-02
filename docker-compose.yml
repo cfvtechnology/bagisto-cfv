@@ -4,12 +4,30 @@ services:
       context: .
       dockerfile: ./Dockerfile
       args:
-        uid: 1000
-        user: bagisto
+        uid: ${APP_UID:-1000}
+        user: ${APP_USER:-bagisto}
         container_project_path: /var/www/html/
     image: bagisto-php-fpm
+    environment:
+      # Database configuration
+      DB_HOST: ${DB_HOST:-mysql}
+      DB_PORT: ${DB_PORT:-3306}
+      DB_DATABASE: ${DB_DATABASE:-bagisto}
+      DB_USERNAME: ${DB_USERNAME:-root}
+      DB_PASSWORD: ${DB_PASSWORD:-root}
+      # Bagisto setup configuration
+      AUTO_SETUP: ${AUTO_SETUP:-true}
+      BAGISTO_VERSION: ${BAGISTO_VERSION:-v2.3.6}
+      SEED_SAMPLE_DATA: ${SEED_SAMPLE_DATA:-false}
+      CREATE_TEST_DB: ${CREATE_TEST_DB:-false}
+      # Application URL (update this with your domain in Dokploy)
+      APP_URL: ${APP_URL:-http://localhost}
+      APP_ENV: ${APP_ENV:-local}
+      APP_DEBUG: ${APP_DEBUG:-true}
     volumes:
       - ./workspace/:/var/www/html/
+    depends_on:
+      - mysql
 
   nginx:
     image: nginx:latest
@@ -26,7 +44,7 @@ services:
     command: --default-authentication-plugin=mysql_native_password
     environment:
       MYSQL_ROOT_HOST: "%"
-      MYSQL_ROOT_PASSWORD: root
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-root}
     volumes:
       - ./.configs/data/mysql-data:/var/lib/mysql/
 
@@ -35,9 +53,9 @@ services:
     expose:
       - "80" # solo interno; si se quiere dominio aparte, Dokploy lo expondrá
     environment:
-      PMA_HOST: mysql
-      PMA_USER: root
-      PMA_PASSWORD: root
+      PMA_HOST: ${DB_HOST:-mysql}
+      PMA_USER: ${DB_USERNAME:-root}
+      PMA_PASSWORD: ${DB_PASSWORD:-root}
       UPLOAD_LIMIT: 2G
       MEMORY_LIMIT: 2G
       MAX_EXECUTION_TIME: 600
