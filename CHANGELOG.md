@@ -64,6 +64,26 @@
 - Improved error handling and user feedback
 - Colored console output for better debugging
 
+### 🐛 Bug Fixes
+
+- **MySQL Password Special Characters Fix**
+  - Fixed issue with passwords containing special characters (e.g., `@`, `!`, `#`)
+  - Changed from `-pPASSWORD` format to `MYSQL_PWD` environment variable
+  - All MySQL commands now properly handle complex passwords
+  - Resolves connection failures when using secure passwords
+
+- **Docker Networking Clarification**
+  - Fixed common `localhost` vs `mysql` hostname confusion in documentation
+  - Clear warnings in all configuration files about correct `DB_HOST` value
+  - Updated `.env.dokploy.example` with correct `DB_HOST=mysql`
+
+### 📖 New Documentation
+
+- **`DOKPLOY-FIX.md`** - Quick fix guide for Dokploy deployments
+  - Corrects common configuration errors
+  - Step-by-step variable configuration
+  - Database cleanup procedures
+
 ### 🔐 Security Improvements
 
 - **Environment Variables Externalization**

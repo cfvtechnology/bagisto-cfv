@@ -109,8 +109,8 @@ wait_for_mysql() {
     fi
 
     while [ $attempt -le $max_attempts ]; do
-        # Try to connect to MySQL
-        if mysql -h"${DB_HOST:-mysql}" -P"${DB_PORT:-3306}" -u"${DB_USERNAME:-root}" -p"${DB_PASSWORD:-root}" -e "SELECT 1" >/dev/null 2>&1; then
+        # Try to connect to MySQL (using MYSQL_PWD to handle special characters in password)
+        if MYSQL_PWD="${DB_PASSWORD:-root}" mysql -h"${DB_HOST:-mysql}" -P"${DB_PORT:-3306}" -u"${DB_USERNAME:-root}" -e "SELECT 1" >/dev/null 2>&1; then
             log_success "MySQL está listo y aceptando conexiones"
             return 0
         fi
@@ -166,7 +166,7 @@ create_database() {
 
     log_info "Verificando/creando base de datos: $db_name"
 
-    if mysql -h"${DB_HOST:-mysql}" -u"${DB_USERNAME:-root}" -p"${DB_PASSWORD:-root}" \
+    if MYSQL_PWD="${DB_PASSWORD:-root}" mysql -h"${DB_HOST:-mysql}" -u"${DB_USERNAME:-root}" \
         -e "CREATE DATABASE IF NOT EXISTS \`$db_name\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" 2>/dev/null; then
         log_success "Base de datos '$db_name' verificada/creada"
     else
@@ -177,7 +177,7 @@ create_database() {
     # Create testing database if needed
     if [ "${CREATE_TEST_DB:-false}" = "true" ]; then
         log_info "Creando base de datos de pruebas..."
-        mysql -h"${DB_HOST:-mysql}" -u"${DB_USERNAME:-root}" -p"${DB_PASSWORD:-root}" \
+        MYSQL_PWD="${DB_PASSWORD:-root}" mysql -h"${DB_HOST:-mysql}" -u"${DB_USERNAME:-root}" \
             -e "CREATE DATABASE IF NOT EXISTS \`${db_name}_testing\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" 2>/dev/null
         log_success "Base de datos de pruebas creada"
     fi
