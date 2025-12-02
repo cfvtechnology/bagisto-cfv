@@ -45,6 +45,10 @@ services:
     environment:
       MYSQL_ROOT_HOST: "%"
       MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-root}
+      # Create custom database and user automatically
+      MYSQL_DATABASE: ${DB_DATABASE:-bagisto}
+      MYSQL_USER: ${DB_USERNAME:-}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-root}
     volumes:
       - ./.configs/data/mysql-data:/var/lib/mysql/
 
