@@ -347,6 +347,10 @@ configure_environment() {
     log_info "Creando archivo .env desde .env.example..."
     cp .env.example .env
 
+    # Fix ownership of .env file so user can modify it
+    chown "$APP_USER:www-data" .env 2>/dev/null || true
+    chmod 664 .env 2>/dev/null || true
+
     # Set database configuration
     log_info "Configurando variables de entorno..."
 
