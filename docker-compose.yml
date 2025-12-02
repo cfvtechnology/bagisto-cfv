@@ -31,10 +31,11 @@ services:
       APP_LOCALE: ${APP_LOCALE:-en}
       APP_FALLBACK_LOCALE: ${APP_FALLBACK_LOCALE:-en}
       APP_CURRENCY: ${APP_CURRENCY:-USD}
-      # Redis configuration
+      # Redis configuration (optional - use file-based by default)
       REDIS_HOST: ${REDIS_HOST:-redis}
       REDIS_PORT: ${REDIS_PORT:-6379}
       REDIS_PASSWORD: ${REDIS_PASSWORD:-null}
+      # Cache/Session/Queue drivers (file = no Redis needed, redis = better performance)
       CACHE_STORE: ${CACHE_STORE:-file}
       SESSION_DRIVER: ${SESSION_DRIVER:-file}
       QUEUE_CONNECTION: ${QUEUE_CONNECTION:-sync}
