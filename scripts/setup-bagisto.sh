@@ -318,16 +318,10 @@ setup_bagisto_source() {
     fi
 }
 
-# Install Composer dependencies
-install_dependencies() {
+# Prepare Laravel directories with correct permissions
+prepare_laravel_directories() {
     cd "$WORK_DIR"
 
-    if [ -d "$VENDOR_DIR" ] && [ -n "$(ls -A $VENDOR_DIR 2>/dev/null)" ]; then
-        log_info "Dependencias de Composer ya instaladas"
-        return 0
-    fi
-
-    # Create and set permissions for Laravel directories before composer install
     log_info "Preparando directorios de Laravel..."
 
     # Create directories if they don't exist
@@ -338,6 +332,21 @@ install_dependencies() {
 
     # Set permissions
     chmod -R 775 storage bootstrap/cache 2>/dev/null || true
+
+    log_success "Directorios de Laravel preparados"
+}
+
+# Install Composer dependencies
+install_dependencies() {
+    cd "$WORK_DIR"
+
+    if [ -d "$VENDOR_DIR" ] && [ -n "$(ls -A $VENDOR_DIR 2>/dev/null)" ]; then
+        log_info "Dependencias de Composer ya instaladas"
+        return 0
+    fi
+
+    # Ensure Laravel directories exist before composer install
+    prepare_laravel_directories
 
     log_info "Instalando dependencias de Composer..."
 
@@ -439,6 +448,9 @@ configure_environment() {
     [ -n "${FILESYSTEM_DISK}" ] && sed -i "s/FILESYSTEM_DISK=.*/FILESYSTEM_DISK=${FILESYSTEM_DISK}/" .env
 
     log_success "Variables de entorno configuradas desde el contenedor"
+
+    # Ensure Laravel directories exist with correct permissions before running artisan commands
+    prepare_laravel_directories
 
     # Generate application key
     log_info "Generando APP_KEY..."
