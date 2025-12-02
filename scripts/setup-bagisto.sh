@@ -81,36 +81,21 @@ wait_for_mysql() {
     log_info "  - DB_USERNAME: ${DB_USERNAME:-root}"
     log_info "  - DB_DATABASE: ${DB_DATABASE:-bagisto}"
 
-    local max_attempts=60  # Increased from 30 to 60
+    local max_attempts=60
     local attempt=1
-    local sleep_time=3  # Increased from 2 to 3 seconds
-
-    # First, check if we can reach the host
-    log_info "Verificando conectividad de red..."
-    if command -v nc >/dev/null 2>&1; then
-        if nc -z "${DB_HOST:-mysql}" "${DB_PORT:-3306}" 2>/dev/null; then
-            log_success "Puerto ${DB_PORT:-3306} en ${DB_HOST:-mysql} es accesible"
-        else
-            log_warning "No se puede conectar al puerto ${DB_PORT:-3306} en ${DB_HOST:-mysql}"
-            log_info "Esto puede ser normal si MySQL aún está iniciando..."
-        fi
-    fi
-
-    # Try to resolve the hostname
-    log_info "Intentando resolver hostname ${DB_HOST:-mysql}..."
-    if command -v getent >/dev/null 2>&1; then
-        if getent hosts "${DB_HOST:-mysql}" >/dev/null 2>&1; then
-            local ip=$(getent hosts "${DB_HOST:-mysql}" | awk '{print $1}')
-            log_success "Hostname resuelto a IP: $ip"
-        else
-            log_warning "No se pudo resolver el hostname ${DB_HOST:-mysql}"
-            log_info "Esperando a que el servicio esté disponible en la red Docker..."
-        fi
-    fi
+    local sleep_time=3
 
     while [ $attempt -le $max_attempts ]; do
-        # Try to connect to MySQL (using MYSQL_PWD to handle special characters in password)
-        if MYSQL_PWD="${DB_PASSWORD:-root}" mysql -h"${DB_HOST:-mysql}" -P"${DB_PORT:-3306}" -u"${DB_USERNAME:-root}" -e "SELECT 1" >/dev/null 2>&1; then
+        # Try to connect to MySQL using PHP PDO
+        if php -r "
+            try {
+                \$dsn = 'mysql:host=${DB_HOST:-mysql};port=${DB_PORT:-3306}';
+                \$pdo = new PDO(\$dsn, '${DB_USERNAME:-root}', '${DB_PASSWORD:-root}');
+                exit(0);
+            } catch (PDOException \$e) {
+                exit(1);
+            }
+        " 2>/dev/null; then
             log_success "MySQL está listo y aceptando conexiones"
             return 0
         fi
@@ -118,29 +103,6 @@ wait_for_mysql() {
         # Show progress every 5 attempts
         if [ $((attempt % 5)) -eq 0 ]; then
             log_info "Intento $attempt/$max_attempts - MySQL aún no disponible..."
-
-            # Additional diagnostics every 10 attempts
-            if [ $((attempt % 10)) -eq 0 ]; then
-                log_info "Diagnóstico adicional:"
-
-                # Check if MySQL port is open
-                if command -v nc >/dev/null 2>&1; then
-                    if nc -z "${DB_HOST:-mysql}" "${DB_PORT:-3306}" 2>/dev/null; then
-                        log_info "  ✓ Puerto MySQL es accesible (MySQL puede estar iniciando)"
-                    else
-                        log_warning "  ✗ Puerto MySQL no es accesible (contenedor puede no estar listo)"
-                    fi
-                fi
-
-                # Try to ping the host
-                if command -v ping >/dev/null 2>&1; then
-                    if ping -c 1 -W 1 "${DB_HOST:-mysql}" >/dev/null 2>&1; then
-                        log_info "  ✓ Host ${DB_HOST:-mysql} responde a ping"
-                    else
-                        log_warning "  ✗ Host ${DB_HOST:-mysql} no responde a ping"
-                    fi
-                fi
-            fi
         fi
 
         sleep $sleep_time
@@ -151,11 +113,12 @@ wait_for_mysql() {
     log_error ""
     log_error "Pasos para diagnosticar:"
     log_error "1. Verifica que el servicio 'mysql' esté corriendo en Dokploy"
-    log_error "2. Revisa los logs del contenedor MySQL"
+    log_error "2. Revisa los logs del contenedor MySQL en Dokploy"
     log_error "3. Verifica que DB_HOST=${DB_HOST:-mysql} sea correcto"
-    log_error "4. Verifica las credenciales: DB_USERNAME=${DB_USERNAME:-root}"
-    log_error "5. Intenta ejecutar manualmente:"
-    log_error "   docker exec -it <mysql-container> mysql -u${DB_USERNAME:-root} -p"
+    log_error "4. Verifica las credenciales en las variables de entorno:"
+    log_error "   - DB_USERNAME=${DB_USERNAME:-root}"
+    log_error "   - DB_PASSWORD está configurado correctamente"
+    log_error "5. Verifica que ambos contenedores estén en la misma red Docker"
 
     return 1
 }
@@ -166,19 +129,37 @@ create_database() {
 
     log_info "Verificando/creando base de datos: $db_name"
 
-    if MYSQL_PWD="${DB_PASSWORD:-root}" mysql -h"${DB_HOST:-mysql}" -u"${DB_USERNAME:-root}" \
-        -e "CREATE DATABASE IF NOT EXISTS \`$db_name\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" 2>/dev/null; then
+    # Use PHP to create database
+    if php -r "
+        try {
+            \$dsn = 'mysql:host=${DB_HOST:-mysql};port=${DB_PORT:-3306}';
+            \$pdo = new PDO(\$dsn, '${DB_USERNAME:-root}', '${DB_PASSWORD:-root}');
+            \$pdo->exec('CREATE DATABASE IF NOT EXISTS \`$db_name\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
+            exit(0);
+        } catch (PDOException \$e) {
+            file_put_contents('php://stderr', 'Error: ' . \$e->getMessage() . PHP_EOL);
+            exit(1);
+        }
+    " 2>/dev/null; then
         log_success "Base de datos '$db_name' verificada/creada"
     else
         log_error "No se pudo crear la base de datos '$db_name'"
+        log_error "Verifica los permisos del usuario ${DB_USERNAME:-root}"
         return 1
     fi
 
     # Create testing database if needed
     if [ "${CREATE_TEST_DB:-false}" = "true" ]; then
         log_info "Creando base de datos de pruebas..."
-        MYSQL_PWD="${DB_PASSWORD:-root}" mysql -h"${DB_HOST:-mysql}" -u"${DB_USERNAME:-root}" \
-            -e "CREATE DATABASE IF NOT EXISTS \`${db_name}_testing\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" 2>/dev/null
+        php -r "
+            try {
+                \$dsn = 'mysql:host=${DB_HOST:-mysql};port=${DB_PORT:-3306}';
+                \$pdo = new PDO(\$dsn, '${DB_USERNAME:-root}', '${DB_PASSWORD:-root}');
+                \$pdo->exec('CREATE DATABASE IF NOT EXISTS \`${db_name}_testing\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
+            } catch (PDOException \$e) {
+                // Ignore errors for test database
+            }
+        " 2>/dev/null
         log_success "Base de datos de pruebas creada"
     fi
 }
